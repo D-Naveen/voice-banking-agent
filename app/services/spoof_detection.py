@@ -14,12 +14,15 @@ editable thresholds, so a provider can be swapped without touching the policy.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import tempfile
 from dataclasses import dataclass
 from typing import Protocol
 
 import httpx
+
+log = logging.getLogger("voicebank.spoof")
 
 PASS_SCORE = 0.30
 BLOCK_SCORE = 0.70
@@ -63,32 +66,100 @@ class HttpDetector:
         return SpoofResult(float(data["score"]), bool(data.get("is_spoof", False)), self.name)
 
 
+
 class HuggingFaceDetector:
-    """Wraps a Hugging Face audio-classification model. Loaded lazily, cached."""
+    """Wraps a Hugging Face audio anti-spoofing model."""
 
     name = "huggingface"
     _pipe = None
+    _loaded_model_id = None
 
     def __init__(self, model_id: str, spoof_labels: set[str]):
-        self.model_id, self.spoof_labels = model_id, spoof_labels
+        self.model_id = model_id
+        self.spoof_labels = {
+            label.casefold() for label in spoof_labels
+        }
+
+        if not self.spoof_labels:
+            raise ValueError(
+                "At least one spoof label must be configured."
+            )
 
     def _load(self):
-        if HuggingFaceDetector._pipe is None:
-            from transformers import pipeline  # optional heavy dependency
-            HuggingFaceDetector._pipe = pipeline("audio-classification", model=self.model_id)
+        if (
+            HuggingFaceDetector._pipe is None
+            or HuggingFaceDetector._loaded_model_id != self.model_id
+        ):
+            from transformers import pipeline
+
+            HuggingFaceDetector._pipe = pipeline(
+                "audio-classification",
+                model=self.model_id,
+            )
+            HuggingFaceDetector._loaded_model_id = self.model_id
+
         return HuggingFaceDetector._pipe
 
     def _run(self, audio: bytes, filename: str) -> SpoofResult:
-        suffix = os.path.splitext(filename)[1] or ".webm"
-        with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:   # deleted immediately
-            tmp.write(audio)
-            tmp.flush()
-            results = self._load()(tmp.name, top_k=None)
-        score = sum(r["score"] for r in results if r["label"].casefold() in self.spoof_labels)
-        return SpoofResult(min(1.0, float(score)), False, self.name)
+        if not audio:
+            raise ValueError("No audio data was provided.")
 
-    async def score(self, audio: bytes, filename: str) -> SpoofResult:
-        return await asyncio.to_thread(self._run, audio, filename)
+        suffix = os.path.splitext(filename)[1] or ".webm"
+        fd, path = tempfile.mkstemp(suffix=suffix)
+
+        try:
+            with os.fdopen(fd, "wb") as tmp:
+                tmp.write(audio)
+
+            results = self._load()(path, top_k=None)
+
+            if not results:
+                raise ValueError(
+                    "The model returned no predictions."
+                )
+
+            fake_scores = [
+                float(item["score"])
+                for item in results
+                if item["label"].casefold() in self.spoof_labels
+            ]
+
+            if not fake_scores:
+                labels = [item["label"] for item in results]
+                raise ValueError(
+                    f"No configured spoof label found. "
+                    f"Received labels: {labels}"
+                )
+
+            spoof_score = sum(fake_scores)
+
+            if not 0.0 <= spoof_score <= 1.0:
+                raise ValueError(
+                    "The model returned an invalid spoof score."
+                )
+
+            return SpoofResult(
+                float(spoof_score),
+                False,
+                self.name,
+            )
+
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    async def score(
+        self,
+        audio: bytes,
+        filename: str,
+    ) -> SpoofResult:
+        return await asyncio.to_thread(
+            self._run,
+            audio,
+            filename,
+        )
 
 
 def get_detector() -> SpoofDetector | None:
@@ -120,8 +191,10 @@ async def check_audio(audio_bytes: bytes | None, filename: str = "challenge.webm
                 "message": "Audio was too large to check; PIN step-up is required."}
     try:
         res = await detector.score(audio_bytes, filename)
-    except Exception:
+    except Exception as exc:
+        log.exception("anti-spoof detector failed")      # traceback goes to server logs, never the audio
         return {"status": "step_up", "score": None, "provider": detector.name,
+                "error": f"{type(exc).__name__}: {str(exc)[:200]}",
                 "message": "The anti-spoof detector failed; PIN step-up is required."}
     status = classify_score(res.score, res.is_spoof, pass_below, block_at)
     return {"status": status, "score": round(res.score, 4), "provider": detector.name,
