@@ -1,0 +1,22 @@
+services:
+  voicebank:
+    build:
+      context: .
+      args:
+        INSTALL_SPOOF: "${INSTALL_SPOOF:-0}"
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "sqlite:////data/voice_banking.db"
+      AUTO_SEED: "true"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      SPOOF_PROVIDER: "${SPOOF_PROVIDER:-}"
+      SPOOF_DETECTOR_URL: "${SPOOF_DETECTOR_URL:-}"
+      SPOOF_HF_MODEL: "${SPOOF_HF_MODEL:-}"
+      SPOOF_HF_SPOOF_LABELS: "${SPOOF_HF_SPOOF_LABELS:-fake,spoof,deepfake,ai,synthetic}"
+    volumes:
+      - voicebank_data:/data
+    restart: unless-stopped
+
+volumes:
+  voicebank_data:

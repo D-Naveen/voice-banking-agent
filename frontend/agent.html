@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoiceBank · Agent console</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-icon">V</span><span>VoiceBank · Agent</span></a>
+    <div class="topbar-right">
+      <a class="link-small" href="/">Customer screen</a>
+      <button id="agentLogout" class="link-button hidden" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container wide">
+    <section id="agentLoginPanel" class="card">
+      <h1>Agent sign in</h1>
+      <form id="agentLoginForm" novalidate>
+        <label for="agentUsername">Username</label>
+        <input id="agentUsername" autocomplete="username" placeholder="agent1">
+        <label for="agentPassword">Password</label>
+        <input id="agentPassword" type="password" autocomplete="current-password" placeholder="agent123">
+        <br><br>
+        <button class="btn primary" type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <div id="agentMessage" class="notice hidden" role="status" aria-live="polite"></div>
+
+    <div id="agentApp" class="hidden">
+      <div class="agent-grid">
+        <section class="card">
+          <div class="row">
+            <h2>Queue</h2>
+            <select id="statusFilter" aria-label="Filter by status">
+              <option value="open">Open</option>
+              <option value="waiting_customer">Waiting for customer</option>
+              <option value="resolved">Resolved</option>
+              <option value="all">All</option>
+            </select>
+            <button id="refreshButton" class="btn" type="button">Refresh</button>
+          </div>
+          <div id="caseList"></div>
+        </section>
+
+        <section class="card" id="caseDetail">
+          <p class="muted">Select a case from the queue.</p>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="row"><h2>Confidence router &amp; limits</h2>
+          <button id="settingsToggle" class="btn" type="button" aria-expanded="false">Show</button></div>
+        <p class="muted small">Editable thresholds. Every change needs a note and is logged.</p>
+        <div id="settingsBody" class="hidden"></div>
+      </section>
+
+      <section class="card">
+        <div class="row"><h2>Audit trail</h2>
+          <button id="refreshAuditButton" class="btn" type="button">Refresh</button></div>
+        <div id="auditLogList"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/static/agent.js"></script>
+</body>
+</html>

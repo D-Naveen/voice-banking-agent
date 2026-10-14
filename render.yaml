@@ -1,0 +1,18 @@
+# Render Blueprint: one Docker web service (API + static frontend) with a persistent disk for SQLite.
+services:
+  - type: web
+    name: voicebank
+    runtime: docker
+    plan: starter            # persistent disks need a paid plan; for a free demo use ephemeral storage (auto-seeds on boot)
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////data/voice_banking.db
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: AUTO_SEED
+        value: "true"

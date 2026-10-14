@@ -1,0 +1,7 @@
+# Optional: a real local anti-spoofing model (Hugging Face audio-classification).
+# Also needs the ffmpeg binary (apt install ffmpeg). Large download (~1 GB with torch).
+-r requirements.txt
+transformers
+torch
+librosa
+soundfile
