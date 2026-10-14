@@ -607,7 +607,7 @@ async def handle_liveness(db: Session, user: User, session_id: str, challenge_id
     intent.spoof_status = spoof["status"]
     intent.spoof_score = spoof["score"]
     _audit(db, sess, "audio_spoof_check", status=spoof["status"], score=spoof["score"],
-           provider=spoof["provider"])
+           provider=spoof["provider"], error=spoof.get("error"))
 
     if spoof["status"] == "blocked":
         return _handoff(db, sess, "Anti-spoof detector flagged possible synthetic or replayed audio.",
