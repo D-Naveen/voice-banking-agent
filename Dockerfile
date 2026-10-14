@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # Build with  --build-arg INSTALL_SPOOF=1  to include the local Hugging Face anti-spoof model runtime.
-ARG INSTALL_SPOOF=1
+ARG INSTALL_SPOOF=0
 WORKDIR /app
 
 COPY requirements.txt requirements-spoof.txt ./
